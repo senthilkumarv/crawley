@@ -1,20 +1,16 @@
-use futures::TryFutureExt;
 use tokio::sync::mpsc::channel;
 
-use crate::queue::CrawlQueue;
-use crate::result_publisher::{create_tokio_publisher, ResultPublisher};
-use crate::service::{ScraperError, ScrapeService};
+use crate::result_publisher::{create_tokio_publisher};
+use crate::service::{ScrapeService};
 
 pub struct Crawly<Scraper: ScrapeService> {
     scraper: Scraper,
-    queue: CrawlQueue,
 }
 
 impl<Scraper: ScrapeService> Crawly<Scraper> {
-    pub fn new(scraper: Scraper, queue: CrawlQueue) -> Crawly<Scraper> {
+    pub fn new(scraper: Scraper) -> Crawly<Scraper> {
         Crawly {
             scraper,
-            queue,
         }
     }
 
@@ -23,27 +19,12 @@ impl<Scraper: ScrapeService> Crawly<Scraper> {
         let _ = tx.send(vec![start_url.to_string()]).await?;
         let publisher = create_tokio_publisher(tx);
         while let Some(res) = rx.recv().await {
-            info!("Received event with {} links, processing {}", res.clone().len(), self.queue.len());
-            let _ = self.crawl_all(res, &publisher).await?;
-            if self.queue.is_empty() {
+            info!("Result: {:?}", res);
+            let _ = self.scraper.scrape_links(res, &publisher).await?;
+            if !self.scraper.has_more_items_to_scrape() {
                 rx.close();
             }
         }
-        Ok(self.queue.finished().iter().map(|link| link.clone()).collect())
-    }
-
-    async fn crawl_all(&self, links: Vec<String>, publisher: &dyn ResultPublisher<Vec<String>, ScraperError>) -> Result<(), Box<dyn std::error::Error>> {
-        self.queue.add_all(links);
-        let unvisited_links = self.queue.items();
-        let parallels: Vec<_> = unvisited_links.iter().map(|link| {
-            self.queue.mark_as_done(link.as_str());
-            self.scraper.scrape(link, publisher)
-                .and_then(|result| {
-                    self.queue.add_all(result.clone());
-                    futures::future::ok(result)
-                })
-        }).collect();
-        futures::future::join_all(parallels).await;
-        Ok(())
+        Ok(self.scraper.result().iter().map(|link| link.clone()).collect())
     }
 }

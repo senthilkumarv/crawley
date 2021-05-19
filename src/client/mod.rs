@@ -10,6 +10,8 @@ use crate::client::crawl_client::CrawleyCrawlClient;
 mod crawl_client;
 mod error;
 
+#[cfg(test)]
+pub use crate::client::crawl_client::MockCrawlClient;
 
 pub fn create_client() -> CrawleyCrawlClient {
     let client = Client::builder()

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Debug};
 use hyper::http::uri::InvalidUri;
 use url::ParseError;
 use std::error::Error;
@@ -15,7 +15,7 @@ impl Display for LinkConstructionError {
         let display_string = match self {
             LinkConstructionError::MissingScheme => "Uri is missing scheme".to_string(),
             LinkConstructionError::BadUri => "Bad Uri. Cannot parse".to_string(),
-            LinkConstructionError::ParseError(kind) => format!("{:?}", kind)
+            LinkConstructionError::ParseError(kind) => format!("{}", kind)
         };
         write!(fmt, ": {}", display_string)
     }
@@ -29,7 +29,7 @@ impl From<InvalidUri> for LinkConstructionError {
 
 impl From<ParseError> for LinkConstructionError {
     fn from(error: ParseError) -> Self {
-        LinkConstructionError::ParseError(format!("{:?}", error))
+        LinkConstructionError::ParseError(format!("Bad URL({:?}). Should be in format of scheme://domain/path.", error))
     }
 }
 

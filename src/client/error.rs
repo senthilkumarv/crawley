@@ -3,7 +3,7 @@ use std::error::Error;
 use hyper::http::uri::InvalidUri;
 use std::string::FromUtf8Error;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum CrawlClientError {
     InvalidUri,
     ConnectionError,
