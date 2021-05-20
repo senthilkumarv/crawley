@@ -134,15 +134,15 @@ mod tests {
         let mut client = MockCrawlClient::new();
         client
             .expect_crawl_and_fetch_links()
-            .with(eq("http://test.com/page1.html"))
+            .with(eq("http://test.com/base/page1.html"))
             .returning(|_| Ok(vec!["page2.html".to_string(), "https://github.com/test.html".to_string(), "../page3.html".to_string()]));
         client
             .expect_crawl_and_fetch_links()
-            .with(eq("http://test.com/page2.html"))
+            .with(eq("http://test.com/base/page2.html"))
             .returning(|_| Ok(vec!["page4.html".to_string(), "https://github.com/test.html".to_string(), "../page5.html".to_string()]));
         client
             .expect_crawl_and_fetch_links()
-            .with(eq("http://test.com/page3.html"))
+            .with(eq("http://test.com/base/page3.html"))
             .returning(|_| Ok(vec!["page6.html".to_string(), "https://github.com/test.html".to_string(), "../page7.html".to_string()]));
         let mut publisher = MockResultPublisher::<Vec<String>, ScraperError>::new();
         publisher
@@ -151,12 +151,12 @@ mod tests {
         let service = CrawleyScrapeService::new(client, create_queue("http://test.com/").unwrap(), publisher);
 
         let result = service.scrape_links(vec![
-            "http://test.com/page1.html",
-            "http://test.com/page2.html",
-            "http://test.com/page3.html"
+            "http://test.com/base/page1.html",
+            "http://test.com/base/page2.html",
+            "http://test.com/base/page3.html"
         ].iter().map(|link| link.to_string()).collect()).await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().len(), 9);
+        assert_eq!(result.unwrap().len(), 5);
     }
 }
