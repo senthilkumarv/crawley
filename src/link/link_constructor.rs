@@ -17,22 +17,22 @@ impl TryFrom<&str> for LinkConstructor {
     fn try_from(parent: &str) -> Result<Self, Self::Error> {
         let uri = Uri::from_str(parent)?;
         let scheme = uri.scheme_str()
-            .map(|scheme| Ok(scheme))
+            .map(Ok)
             .unwrap_or_else(|| Err(LinkConstructionError::MissingScheme))?;
-        let authority = uri.authority().map(|authority| authority.as_str()).unwrap_or_else(|| "");
-        let path = if uri.path().ends_with("/") {
+        let authority = uri.authority().map(|authority| authority.as_str()).unwrap_or("");
+        let path = if uri.path().ends_with('/') {
             uri.path().to_string()
         } else {
-            let path_parts = uri.path().split("/").collect::<Vec<&str>>();
+            let path_parts = uri.path().split('/').collect::<Vec<&str>>();
             let path: Vec<&str> = (0..(path_parts.len() - 1))
-                .filter_map(|part| path_parts.get(part).map(|value| value.clone()))
+                .filter_map(|part| path_parts.get(part).cloned())
                 .collect();
             format!("{}/", path.join("/"))
         };
         Ok(LinkConstructor {
             scheme: scheme.to_string(),
             authority: authority.to_string(),
-            path: path.to_string(),
+            path,
             parent: parent.to_string()
         })
     }
@@ -43,8 +43,8 @@ impl LinkConstructor {
         if href.starts_with("javascript:") {
             return Err(LinkConstructionError::BadUri)
         }
-        if href.starts_with("#") {
-            return Ok(format!("{}", self.parent))
+        if href.starts_with('#') {
+            return Ok(self.parent.clone())
         }
         let href_to_parse = if href.starts_with("//") {
             format!("{}:{}", self.scheme, href)
@@ -53,7 +53,7 @@ impl LinkConstructor {
         };
         let url = match Url::parse(href_to_parse.as_str()) {
             Ok(url) => Ok(url.to_string()),
-            Err(ParseError::RelativeUrlWithoutBase) => if href.starts_with("/") {
+            Err(ParseError::RelativeUrlWithoutBase) => if href.starts_with('/') {
                 Ok(format!("{}://{}{}", self.scheme, self.authority, href))
             } else {
                 Ok(format!("{}://{}{}{}", self.scheme, self.authority, self.path, href))

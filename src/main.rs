@@ -6,6 +6,7 @@ use service::CrawleyScrapeService;
 
 use crate::crawly::Crawly;
 use clap::{App, Arg};
+use crate::result_publisher::TokioResultPublisher;
 
 mod queue;
 mod service;
@@ -26,12 +27,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .required(true)
             .index(1))
         .get_matches();
-    let url = matches.value_of("INPUT").unwrap_or_else(|| "");
-    let queue = queue::create_queue(url)?;
-    let crawly = Crawly::new(
-        CrawleyScrapeService::new(client::create_client(), queue),
-    );
-    let links = crawly.start_crawling(url).await?;
+    let url = matches.value_of("INPUT").unwrap_or("");
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<String>>(2048);
+    let service = CrawleyScrapeService::new(
+        client::create_client(),
+        queue::create_queue(url)?,
+        TokioResultPublisher::new(tx));
+    let crawly = Crawly::new(service);
+    let links = crawly.start_crawling(url, &mut rx).await?;
     links.iter().for_each(|link| println!("{:?}", link));
     Ok(())
 }

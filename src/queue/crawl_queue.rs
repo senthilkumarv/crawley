@@ -48,12 +48,12 @@ impl CrawlQueue {
 
     pub fn finished(&self) -> Vec<String> {
         let finished_guard = self.processed.guard();
-        self.processed.iter(&finished_guard).map(|link| link.clone()).collect()
+        self.processed.iter(&finished_guard).cloned().collect()
     }
 
     pub fn items(&self) -> Vec<String> {
         let queue_guard = self.queue.guard();
-        self.queue.iter(&queue_guard).map(|link| link.clone()).collect()
+        self.queue.iter(&queue_guard).cloned().collect()
     }
 
     pub fn is_empty(&self) -> bool {

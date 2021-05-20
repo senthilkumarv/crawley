@@ -12,8 +12,8 @@ pub enum ScraperError {
 impl Display for ScraperError {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
         let display_string = match self {
-            ScraperError::InvalidUrl(_) => format!("Invalid link or url"),
-            ScraperError::ClientError => format!("There was an error fetching from url")
+            ScraperError::InvalidUrl(_) => "Invalid link or url".to_string(),
+            ScraperError::ClientError => "There was an error fetching from url".to_string(),
         };
         writeln!(fmt, "{:?}", display_string)
     }

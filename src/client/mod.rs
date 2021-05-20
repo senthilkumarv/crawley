@@ -16,6 +16,5 @@ pub use crate::client::crawl_client::MockCrawlClient;
 pub fn create_client() -> CrawleyCrawlClient {
     let client = Client::builder()
         .build::<HttpsConnector<HttpConnector>, Body>(HttpsConnector::new());
-    let crawl_client = CrawleyCrawlClient::new(client);
-    crawl_client
+    CrawleyCrawlClient::new(client)
 }

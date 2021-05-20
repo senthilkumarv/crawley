@@ -14,10 +14,10 @@ pub enum CrawlClientError {
 impl Display for CrawlClientError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let display_string = match self {
-            CrawlClientError::InvalidUri => format!("Invalid link or url"),
-            CrawlClientError::ConnectionError => format!("There was an error connection to the page"),
-            CrawlClientError::IOError => format!("There was an error sending or receiving data"),
-            CrawlClientError::EncodingError => format!("There was an error parsing encoded data")
+            CrawlClientError::InvalidUri => "Invalid link or url",
+            CrawlClientError::ConnectionError => "There was an error connection to the page",
+            CrawlClientError::IOError => "There was an error sending or receiving data",
+            CrawlClientError::EncodingError => "There was an error parsing encoded data",
         };
         writeln!(f, "{:?}", display_string)
     }

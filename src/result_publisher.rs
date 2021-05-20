@@ -27,7 +27,3 @@ impl<R: Clone + Sync + Send + Debug, E: Error + Sync + Send> ResultPublisher<R, 
         Ok(result)
     }
 }
-
-pub fn create_tokio_publisher<T>(tx: Sender<T>) -> TokioResultPublisher<T> {
-    TokioResultPublisher::new(tx)
-}

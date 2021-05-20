@@ -15,7 +15,7 @@ impl Display for LinkConstructionError {
         let display_string = match self {
             LinkConstructionError::MissingScheme => "Uri is missing scheme".to_string(),
             LinkConstructionError::BadUri => "Bad Uri. Cannot parse".to_string(),
-            LinkConstructionError::ParseError(kind) => format!("{}", kind)
+            LinkConstructionError::ParseError(kind) => kind.clone()
         };
         write!(fmt, ": {}", display_string)
     }

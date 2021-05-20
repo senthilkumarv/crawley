@@ -6,30 +6,33 @@ use crate::service::error::ScraperError;
 use crate::queue::CrawlQueue;
 use futures::{FutureExt};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ScrapeService {
     fn has_more_items_to_scrape(&self) -> bool;
     fn result(&self) -> Vec<String>;
 
-    async fn scrape_links(&self, links: Vec<String>, publisher: &dyn ResultPublisher<Vec<String>, ScraperError>) -> Result<Vec<String>, ScraperError>;
+    async fn scrape_links(&self, links: Vec<String>) -> Result<Vec<String>, ScraperError>;
 }
 
-pub struct CrawleyScrapeService<C: CrawlClient> {
+pub struct CrawleyScrapeService<C: CrawlClient, P: ResultPublisher<Vec<String>, ScraperError>> {
     client: C,
     queue: CrawlQueue,
+    publisher: P,
 }
 
-impl<C: CrawlClient> CrawleyScrapeService<C> {
-    pub fn new(client: C, queue: CrawlQueue) -> CrawleyScrapeService<C> {
+impl<C: CrawlClient, P: ResultPublisher<Vec<String>, ScraperError>> CrawleyScrapeService<C, P> {
+    pub fn new(client: C, queue: CrawlQueue, publisher: P) -> CrawleyScrapeService<C, P> {
         CrawleyScrapeService {
             client,
-            queue
+            queue,
+            publisher
         }
     }
 }
 
-impl <C: CrawlClient> CrawleyScrapeService<C> {
-    async fn scrape(&self, link: &str, publisher: &dyn ResultPublisher<Vec<String>, ScraperError>) -> Result<Vec<String>, ScraperError> {
+impl <C: CrawlClient, P: ResultPublisher<Vec<String>, ScraperError>> CrawleyScrapeService<C, P> {
+    async fn scrape(&self, link: &str) -> Result<Vec<String>, ScraperError> {
         let constructor = LinkConstructor::try_from(link)?;
         let response = self.client.crawl_and_fetch_links(link).await;
 
@@ -37,12 +40,12 @@ impl <C: CrawlClient> CrawleyScrapeService<C> {
             .iter()
             .filter_map(|href| constructor.construct(href).ok())
             .collect();
-        publisher.notify(links).await
+        self.publisher.notify(links).await
     }
 }
 
 #[async_trait]
-impl<C: CrawlClient> ScrapeService for CrawleyScrapeService<C> {
+impl<C: CrawlClient, P: ResultPublisher<Vec<String>, ScraperError>> ScrapeService for CrawleyScrapeService<C, P> {
     fn has_more_items_to_scrape(&self) -> bool {
         !self.queue.is_empty()
     }
@@ -51,11 +54,11 @@ impl<C: CrawlClient> ScrapeService for CrawleyScrapeService<C> {
         self.queue.finished()
     }
 
-    async fn scrape_links(&self, links: Vec<String>, publisher: &dyn ResultPublisher<Vec<String>, ScraperError>) -> Result<Vec<String>, ScraperError> {
+    async fn scrape_links(&self, links: Vec<String>) -> Result<Vec<String>, ScraperError> {
         self.queue.add_all(links);
         let unvisited_links = self.queue.items();
         let futures: Vec<_> = unvisited_links.iter().map(|link| {
-            self.scrape(link, publisher)
+            self.scrape(link)
                 .then(move |links| {
                     self.queue.mark_as_done(link);
                     futures::future::ready(links)
@@ -63,7 +66,7 @@ impl<C: CrawlClient> ScrapeService for CrawleyScrapeService<C> {
         }).collect();
         let links = futures::future::join_all(futures).await
             .iter()
-            .filter_map(|result| result.as_ref().ok().map(|links| links.clone()))
+            .filter_map(|result| result.as_ref().ok().cloned())
             .flatten()
             .collect::<Vec<String>>();
         self.queue.add_all(links.clone());
@@ -92,9 +95,9 @@ mod tests {
             .with(eq(vec!["http://test.com/page2.html".to_string(), "https://github.com/test.html".to_string(), "http://test.com/page3.html".to_string()]))
             .returning(|_| Box::pin(futures::future::ok(vec!["".to_string()])));
 
-        let service = CrawleyScrapeService::new(client, CrawlQueue::new(vec![]));
+        let service = CrawleyScrapeService::new(client, CrawlQueue::new(vec![]), publisher);
 
-        let result = service.scrape("http://test.com/page1.html", &publisher).await;
+        let result = service.scrape("http://test.com/page1.html").await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), vec![""])
@@ -113,9 +116,9 @@ mod tests {
             .with(eq(vec!["http://test.com/page2.html".to_string(), "https://github.com/test.html".to_string(), "http://test.com/../page3.html".to_string()]))
             .returning(|_| Box::pin(futures::future::ok(vec!["".to_string()])));
 
-        let service = CrawleyScrapeService::new(client, CrawlQueue::new(vec![]));
+        let service = CrawleyScrapeService::new(client, CrawlQueue::new(vec![]), publisher);
 
-        let result = service.scrape("http://test.com/page1.html", &publisher).await;
+        let result = service.scrape("http://test.com/page1.html").await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), vec![""])
@@ -140,13 +143,13 @@ mod tests {
         publisher
             .expect_notify()
             .returning(|a| Box::pin(futures::future::ok(a)));
-        let service = CrawleyScrapeService::new(client, create_queue("http://test.com/").unwrap());
+        let service = CrawleyScrapeService::new(client, create_queue("http://test.com/").unwrap(), publisher);
 
         let result = service.scrape_links(vec![
             "http://test.com/page1.html",
             "http://test.com/page2.html",
             "http://test.com/page3.html"
-        ].iter().map(|link| link.to_string()).collect(), &publisher).await;
+        ].iter().map(|link| link.to_string()).collect()).await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 9);

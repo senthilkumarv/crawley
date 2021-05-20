@@ -17,7 +17,7 @@ impl TryFrom<&str> for AllowOnlySameDomainDecider {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Url::parse(value)
-            .map(|url| AllowOnlySameDomainDecider { parent_domain: url.domain().unwrap_or_else(|| "").to_string() })
+            .map(|url| AllowOnlySameDomainDecider { parent_domain: url.domain().unwrap_or("").to_string() })
             .map_err(|err| err.into())
     }
 }
@@ -25,7 +25,7 @@ impl TryFrom<&str> for AllowOnlySameDomainDecider {
 impl QueueAdditionDecider for AllowOnlySameDomainDecider {
     fn can_add_to_queue(&self, link: &str) -> bool {
         Url::from_str(link)
-            .map(|uri| uri.host().map(|host| host.to_string()).unwrap_or_else(|| "".to_string()) == self.parent_domain)
+            .map(|uri| uri.host_str().unwrap_or("") == self.parent_domain)
             .unwrap_or_else(|_| false)
     }
 }
