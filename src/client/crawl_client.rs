@@ -29,6 +29,7 @@ impl CrawleyCrawlClient {
 #[async_trait]
 impl CrawlClient for CrawleyCrawlClient {
     async fn crawl_and_fetch_links(&self, url: &str) -> Result<Vec<String>, CrawlClientError> {
+        log::info!("Visiting {}", url);
         let uri = Uri::from_str(url)?;
         let response = self.client.get(uri).await?;
         if !response.status().is_success() {

@@ -4,7 +4,9 @@ use std::convert::TryFrom;
 
 use crate::service::error::ScraperError;
 use crate::queue::CrawlQueue;
-use futures::{FutureExt};
+use futures::{FutureExt, StreamExt};
+use futures::stream::FuturesUnordered;
+use std::iter::FromIterator;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -36,11 +38,12 @@ impl <C: CrawlClient, P: ResultPublisher<Vec<String>, ScraperError>> CrawleyScra
         let constructor = LinkConstructor::try_from(link)?;
         let response = self.client.crawl_and_fetch_links(link).await;
 
-        let links = response?
+        let links: Vec<String> = response?
             .iter()
             .filter_map(|href| constructor.construct(href).ok())
             .collect();
-        self.publisher.notify(links).await
+        let new_ones = self.queue.add_all(links.clone());
+        self.publisher.notify(new_ones).await
     }
 }
 
@@ -55,8 +58,9 @@ impl<C: CrawlClient, P: ResultPublisher<Vec<String>, ScraperError>> ScrapeServic
     }
 
     async fn scrape_links(&self, links: Vec<String>) -> Result<Vec<String>, ScraperError> {
-        self.queue.add_all(links);
+        let items_added = self.queue.add_all(links.clone());
         let unvisited_links = self.queue.items();
+        log::info!("Received {} Added {}", links.len(), items_added.len());
         let futures: Vec<_> = unvisited_links.iter().map(|link| {
             self.scrape(link)
                 .then(move |links| {
@@ -64,13 +68,14 @@ impl<C: CrawlClient, P: ResultPublisher<Vec<String>, ScraperError>> ScrapeServic
                     futures::future::ready(links)
                 })
         }).collect();
-        let links = futures::future::join_all(futures).await
-            .iter()
-            .filter_map(|result| result.as_ref().ok().cloned())
-            .flatten()
-            .collect::<Vec<String>>();
-        self.queue.add_all(links.clone());
-        Ok(links)
+        let mut all_futures = FuturesUnordered::from_iter(futures);
+        let mut results: Vec<String> = vec![];
+        while let Some(res) = all_futures.next().await {
+            if let Ok(mut links) = res {
+                results.append(&mut links);
+            }
+        }
+        Ok(results)
     }
 }
 

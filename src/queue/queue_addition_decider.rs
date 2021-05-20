@@ -4,7 +4,7 @@ use url::{Url};
 use crate::link::LinkConstructionError;
 
 #[cfg_attr(test, mockall::automock)]
-pub trait QueueAdditionDecider: Sync + Send {
+pub trait QueueAdditionDecider: Sync + Send{
     fn can_add_to_queue(&self, link: &str) -> bool;
 }
 

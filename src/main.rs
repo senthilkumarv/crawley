@@ -15,7 +15,7 @@ mod link;
 mod crawly;
 mod result_publisher;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 25)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
     let matches = App::new("Crawley - The web crawler")

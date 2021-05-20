@@ -6,7 +6,7 @@ pub struct Crawly<Scraper: ScrapeService> {
     scraper: Scraper,
 }
 
-impl<Scraper: ScrapeService> Crawly<Scraper> {
+impl<Scraper: ScrapeService + Sync> Crawly<Scraper> {
     pub fn new(scraper: Scraper) -> Crawly<Scraper> {
         Crawly {
             scraper,
