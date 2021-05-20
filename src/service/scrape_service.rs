@@ -6,13 +6,12 @@ use crate::service::error::ScraperError;
 use crate::queue::CrawlQueue;
 use futures::{FutureExt};
 
-#[cfg_attr(test, mockall::automock)]
 #[async_trait]
-pub trait ScrapeService<T: ResultPublisher<Vec<String>, ScraperError>> {
+pub trait ScrapeService {
     fn has_more_items_to_scrape(&self) -> bool;
     fn result(&self) -> Vec<String>;
 
-    async fn scrape_links(&self, links: Vec<String>, publisher: &T) -> Result<Vec<String>, ScraperError>;
+    async fn scrape_links(&self, links: Vec<String>, publisher: &dyn ResultPublisher<Vec<String>, ScraperError>) -> Result<Vec<String>, ScraperError>;
 }
 
 pub struct CrawleyScrapeService<C: CrawlClient> {
@@ -43,7 +42,7 @@ impl <C: CrawlClient> CrawleyScrapeService<C> {
 }
 
 #[async_trait]
-impl<C: CrawlClient, T: ResultPublisher<Vec<String>, ScraperError>> ScrapeService<T> for CrawleyScrapeService<C> {
+impl<C: CrawlClient> ScrapeService for CrawleyScrapeService<C> {
     fn has_more_items_to_scrape(&self) -> bool {
         !self.queue.is_empty()
     }
@@ -52,7 +51,7 @@ impl<C: CrawlClient, T: ResultPublisher<Vec<String>, ScraperError>> ScrapeServic
         self.queue.finished()
     }
 
-    async fn scrape_links(&self, links: Vec<String>, publisher: &T) -> Result<Vec<String>, ScraperError> {
+    async fn scrape_links(&self, links: Vec<String>, publisher: &dyn ResultPublisher<Vec<String>, ScraperError>) -> Result<Vec<String>, ScraperError> {
         self.queue.add_all(links);
         let unvisited_links = self.queue.items();
         let futures: Vec<_> = unvisited_links.iter().map(|link| {
